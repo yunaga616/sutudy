@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>勉強帳</title>
+  <style>
+    body {
+      background: #fff8f5;
+      font-family: "Hiragino Maru Gothic ProN", sans-serif;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #b66a4d;
+      background: #ffe5ec;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    label, input, select, button {
+      display: block;
+      margin: 10px 0;
+      font-size: 16px;
+      width: 100%;
+    }
+    input, select {
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #f7c4c4;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #progressBar {
+      background: #ffa7a7;
+      height: 100%;
+      width: 0%;
+      border-radius: 10px;
+    }
+    .section {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <h1>勉強帳</h1>
+
+  <div class="section">
+    <label for="subject">科目</label>
+    <select id="subject">
+      <option value="MOS Excel 365 Expert">MOS Excel 365 Expert</option>
+      <option value="ITパスポート">ITパスポート</option>
+      <option value="JavaScript勉強">JavaScript勉強</option>
+      <option value="基本情報">基本情報</option>
+    </select>
+
+    <label for="minutes">時間（分）</label>
+    <input type="number" id="minutes" placeholder="例：30" />
+
+    <label for="pages">進んだページ数</label>
+    <input type="number" id="pages" placeholder="例：5" />
+
+    <button onclick="document.activeElement.blur(); addStudyLog();">記録する</button>
+    <div id="log" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="section">
+    <h2>今月の勉強目標</h2>
+    <label for="goalHours">目標（時間）</label>
+    <input type="number" id="goalHours" placeholder="例：20" />
+    <button onclick="document.activeElement.blur(); saveGoal();">目標を保存</button>
+
+    <p>現在の合計勉強時間：<span id="totalHours">0</span>時間</p>
+    <p>残りの勉強時間：<span id="remainingHours">0</span>時間</p>
+    <div style="background: #eee; height: 20px; border-radius: 10px;">
+      <div id="progressBar"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>ページ数ノルマ計算</h2>
+    <label for="totalPages">テキストの総ページ数</label>
+    <input type="number" id="totalPages" placeholder="例：100" />
+    <label for="dueDate">締め切り日</label>
+    <input type="date" id="dueDate" />
+    <button onclick="document.activeElement.blur(); calculateDailyPages();">1日の必要ページ数を計算</button>
+    <p>1日に最低やるべきページ数：<span id="dailyPages">-</span>ページ</p>
+  </div>
+
+  <button onclick="document.activeElement.blur(); resetAll();" style="background: #ffaaaa; margin-top: 20px;">リセット（最初から）</button>
+
+  <script>
+    const log = document.getElementById('log');
+
+    function addStudyLog() {
+      const subject = document.getElementById('subject').value;
+      const minutes = parseInt(document.getElementById('minutes').value);
+      const pages = parseInt(document.getElementById('pages').value);
+      if (!subject || !minutes) return;
+
+      const now = new Date().toLocaleString();
+      const pageText = pages ? `・${pages}ページ` : '';
+      const entry = `${now}：${subject}を${minutes}分${pageText} 勉強したよ！<br>`;
+      log.innerHTML += entry;
+
+      let records = localStorage.getItem('studyLog') || '';
+      records += entry;
+      localStorage.setItem('studyLog', records);
+
+      document.getElementById('minutes').value = '';
+      document.getElementById('pages').value = '';
+      updateProgress();
+      calculateDailyPages();
+    }
+
+    function calculateTotalMinutes() {
+      const logText = localStorage.getItem("studyLog") || "";
+      const lines = logText.split("<br>");
+      let total = 0;
+      for (let line of lines) {
+        const match = line.match(/を(\d+)分/);
+        if (match) total += parseInt(match[1]);
+      }
+      return total;
+    }
+
+    function calculateTotalPagesStudied() {
+      const logText = localStorage.getItem("studyLog") || "";
+      const lines = logText.split("<br>");
+      let total = 0;
+      for (let line of lines) {
+        const match = line.match(/・(\d+)ページ/);
+        if (match) total += parseInt(match[1]);
+      }
+      return total;
+    }
+
+    function saveGoal() {
+      const hours = parseFloat(document.getElementById("goalHours").value);
+      if (!isNaN(hours)) {
+        localStorage.setItem("studyGoalMinutes", hours * 60);
+        updateProgress();
+      }
+    }
+
+    function loadGoal() {
+      const goal = parseInt(localStorage.getItem("studyGoalMinutes") || "0");
+      if (goal) {
+        document.getElementById("goalHours").value = (goal / 60).toFixed(1);
+      }
+    }
+
+    function updateProgress() {
+      const total = calculateTotalMinutes();
+      const goal = parseInt(localStorage.getItem("studyGoalMinutes") || "0");
+      const percent = goal ? Math.min(100, (total / goal) * 100) : 0;
+
+      document.getElementById("totalHours").textContent = (total / 60).toFixed(1);
+      document.getElementById("remainingHours").textContent = Math.max(0, ((goal - total) / 60).toFixed(1));
+      document.getElementById("progressBar").style.width = percent + "%";
+    }
+
+    function calculateDailyPages() {
+      const totalPages = parseInt(document.getElementById("totalPages").value);
+      const dueDate = new Date(document.getElementById("dueDate").value);
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+
+      const diffTime = dueDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      const pagesStudied = calculateTotalPagesStudied();
+      const remainingPages = totalPages - pagesStudied;
+
+      if (!isNaN(totalPages) && diffDays > 0 && remainingPages >= 0) {
+        const daily = Math.ceil(remainingPages / diffDays);
+        document.getElementById("dailyPages").textContent = daily;
+        localStorage.setItem("totalPages", totalPages);
+        localStorage.setItem("dueDate", document.getElementById("dueDate").value);
+      } else {
+        document.getElementById("dailyPages").textContent = "-";
+      }
+    }
+
+    function loadPageInfo() {
+      const savedPages = localStorage.getItem("totalPages");
+      const savedDate = localStorage.getItem("dueDate");
+      if (savedPages) document.getElementById("totalPages").value = savedPages;
+      if (savedDate) document.getElementById("dueDate").value = savedDate;
+    }
+
+    function resetAll() {
+      if (confirm("すべての記録をリセットして最初からにしますか？")) {
+        localStorage.removeItem("studyLog");
+        localStorage.removeItem("studyGoalMinutes");
+        localStorage.removeItem("totalPages");
+        localStorage.removeItem("dueDate");
+        document.getElementById("log").innerHTML = "";
+        document.getElementById("goalHours").value = "";
+        document.getElementById("totalHours").textContent = "0";
+        document.getElementById("remainingHours").textContent = "0";
+        document.getElementById("progressBar").style.width = "0%";
+        document.getElementById("totalPages").value = "";
+        document.getElementById("dueDate").value = "";
+        document.getElementById("dailyPages").textContent = "-";
+        alert("記録をリセットしました！");
+      }
+    }
+
+    window.onload = () => {
+      log.innerHTML = localStorage.getItem("studyLog") || "";
+      updateProgress();
+      loadGoal();
+      loadPageInfo();
+      calculateDailyPages();
+    };
+  </script>
+</body>
+</html>
